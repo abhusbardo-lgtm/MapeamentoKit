@@ -1,0 +1,966 @@
+<title>Mapeamento de Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F1E8;
+    --surface:#ffffff;
+    --surface-alt:#EFE9DB;
+    --text:#242019;
+    --text-muted:#79715F;
+    --border:#E2DAC7;
+    --accent:#2B4C7E;
+    --accent-soft:#E5EBF3;
+    --crit-bg:#C13B2D; --crit-fg:#ffffff;
+    --warn-bg:#D98A17; --warn-fg:#241804;
+    --mon-bg:#F0CE7A;  --mon-fg:#463305;
+    --ok-bg:#3E7D4E;   --ok-fg:#ffffff;
+    --neu-bg:#D3CBB8;  --neu-fg:#3A362B;
+    --risk-bg:#C9701F; --risk-fg:#241203;
+    --shadow: 0 1px 2px rgba(40,32,16,.05), 0 10px 26px -14px rgba(40,32,16,.18);
+  }
+  /* Tema único claro — sem variação por modo escuro do sistema, por escolha do usuário. */
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Inter",system-ui,sans-serif;
+    font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono, .num, td.num, .code{ font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+
+  .wrap{ max-width:1880px; margin:0 auto; padding:28px 32px 64px; }
+
+  header.top{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+    margin-bottom:22px; flex-wrap:wrap;
+  }
+  .brand-row{ display:flex; align-items:flex-start; gap:14px; }
+  .brand .mark{
+    flex-shrink:0; width:42px; height:42px; border-radius:10px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:13px; letter-spacing:.02em;
+    box-shadow:var(--shadow);
+  }
+  .brand h1{
+    font-family:"Archivo",sans-serif; font-weight:800; font-size:24px; letter-spacing:-.01em;
+    margin:2px 0 5px; text-wrap:balance;
+  }
+  .brand p{ margin:0; color:var(--text-muted); font-size:13px; max-width:52ch; }
+
+  .upload-zone{
+    display:flex; align-items:center; gap:12px;
+  }
+  .btn{
+    font:inherit; font-weight:600; font-size:13px; letter-spacing:.01em;
+    background:var(--accent); color:#fff; border:none; border-radius:8px;
+    padding:10px 16px; cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+    transition:filter .12s ease, transform .12s ease;
+  }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.ghost{
+    background:transparent; color:var(--text); border:1px solid var(--border);
+  }
+  .btn.ghost:hover{ background:var(--surface-alt); }
+  #fileInput, #deparaInput{ display:none; }
+
+  .meta-line{ font-size:12px; color:var(--text-muted); margin-top:6px; }
+  .meta-line strong{ color:var(--text); font-weight:600; }
+
+  .empty-state{
+    background:var(--surface); border:1px dashed var(--border); border-radius:14px;
+    padding:64px 32px; text-align:center; color:var(--text-muted); box-shadow:var(--shadow);
+  }
+  .empty-state svg{ opacity:.5; margin-bottom:14px; }
+  .empty-state h2{ font-family:"Archivo",sans-serif; color:var(--text); font-size:18px; margin:0 0 8px; }
+  .empty-state p{ max-width:460px; margin:0 auto; font-size:13.5px; }
+
+  .stat-row{
+    display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:22px;
+  }
+  @media (max-width:1100px){ .stat-row{ grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:640px){ .stat-row{ grid-template-columns:repeat(2,1fr);} }
+  .stat{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:14px 16px; box-shadow:var(--shadow);
+  }
+  .stat .label{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:600;}
+  .stat .value{ font-family:"Archivo",sans-serif; font-weight:800; font-size:26px; margin-top:4px; }
+  .stat.crit .value{ color:var(--crit-bg); }
+  .stat.warn .value{ color:#95610A; }
+  .stat.risk .value{ color:var(--risk-bg); }
+
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+  .tab{
+    font:inherit; font-weight:600; font-size:13.5px; background:none; border:none; cursor:pointer;
+    color:var(--text-muted); padding:10px 4px; margin-right:22px; border-bottom:2px solid transparent;
+    display:flex; align-items:center; gap:8px;
+  }
+  .tab.active{ color:var(--text); border-bottom-color:var(--accent); }
+  .tab .count{
+    font-family:"IBM Plex Mono",monospace; font-size:11px; background:var(--surface-alt);
+    border:1px solid var(--border); border-radius:999px; padding:1px 7px; color:var(--text-muted);
+  }
+
+  .toolbar{
+    display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;
+  }
+  .search{
+    flex:1 1 240px; position:relative;
+  }
+  .search input{
+    width:100%; font:inherit; font-size:13.5px; padding:9px 12px 9px 34px;
+    border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text);
+  }
+  .search input:focus{ outline:2px solid var(--accent); outline-offset:-1px; }
+  .search svg{ position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:.45; }
+
+  .chip{
+    font:inherit; font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:999px;
+    border:1px solid var(--border); background:var(--surface); color:var(--text-muted); cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .chip .swatch{ width:8px; height:8px; border-radius:50%; }
+  .chip.active{ color:var(--text); border-color:var(--accent); background:var(--accent-soft); }
+
+  .table-scroll{
+    overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    box-shadow:var(--shadow);
+  }
+  table{ border-collapse:collapse; width:100%; min-width:1250px; table-layout:fixed; }
+  thead th{
+    position:sticky; top:0; background:var(--surface-alt); z-index:1;
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--text-muted); font-weight:600; padding:10px 12px; border-bottom:1px solid var(--border);
+  }
+  tbody td{
+    padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; font-size:13px;
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr{ position:relative; }
+  tbody tr td:first-child{ border-left:4px solid transparent; }
+  tbody tr.s-crit td:first-child{ border-left-color:var(--crit-bg); }
+  tbody tr.s-warn td:first-child{ border-left-color:var(--warn-bg); }
+  tbody tr.s-mon td:first-child{ border-left-color:var(--mon-bg); }
+  tbody tr.s-ok td:first-child{ border-left-color:var(--ok-bg); }
+  tbody tr.s-neu td:first-child{ border-left-color:var(--neu-bg); }
+  tbody tr:hover{ background:var(--surface-alt); }
+
+  .pill{
+    display:inline-block; padding:4px 10px; border-radius:12px;
+    font-size:11.5px; font-weight:700; letter-spacing:.01em; line-height:1.4;
+  }
+  .pill.crit{ background:var(--crit-bg); color:var(--crit-fg); }
+  .pill.warn{ background:var(--warn-bg); color:var(--warn-fg); }
+  .pill.mon{ background:var(--mon-bg); color:var(--mon-fg); }
+  .pill.ok{ background:var(--ok-bg); color:var(--ok-fg); }
+  .pill.neu{ background:var(--neu-bg); color:var(--neu-fg); }
+
+  .risk-badge{
+    display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px;
+    background:var(--risk-bg); color:var(--risk-fg); font-size:11px; font-weight:700;
+  }
+
+  .kit-tag{
+    display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:11px; background:var(--surface-alt);
+    border:1px solid var(--border); border-radius:5px; padding:1px 5px; margin:1px 3px 1px 0; color:var(--text-muted);
+  }
+
+  .name-cell{ overflow-wrap:break-word; }
+  .kits-cell{ overflow-wrap:break-word; line-height:2.1; }
+  td{ overflow-wrap:break-word; }
+  .kit-more{
+    font:inherit; font-size:10.5px; font-weight:700; border:1px solid var(--border); background:var(--surface-alt);
+    color:var(--accent); border-radius:5px; padding:1px 6px; cursor:pointer; vertical-align:middle;
+  }
+  .sub{ color:var(--text-muted); font-size:11.5px; }
+  .cov-total{ font-weight:700; }
+
+  footer.note{
+    margin-top:18px; font-size:12px; color:var(--text-muted); line-height:1.7;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px;
+  }
+  footer.note b{ color:var(--text); }
+
+  .stat-row{ grid-template-columns:repeat(8,1fr); }
+  @media (max-width:1300px){ .stat-row{ grid-template-columns:repeat(4,1fr);} }
+  @media (max-width:640px){ .stat-row{ grid-template-columns:repeat(2,1fr);} }
+  .stat.money .value{ font-size:20px; color:var(--accent); }
+  .stat.done .value{ color:var(--ok-bg); }
+
+  .toolbar-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .toolbar-row .btn.small, .toolbar-row .chip{ padding:7px 12px; font-size:12.5px; }
+  .btn.small{ font-size:12.5px; padding:8px 13px; }
+  .depara-line{ font-size:12px; color:var(--text-muted); }
+  .depara-line strong{ color:var(--text); }
+  .depara-line a{ color:var(--accent); font-weight:600; cursor:pointer; text-decoration:underline; }
+
+  .diff-banner{
+    background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent);
+    border-radius:10px; padding:14px 18px; margin-bottom:18px; box-shadow:var(--shadow);
+  }
+  .diff-banner h3{ margin:0 0 8px; font-family:"Archivo",sans-serif; font-size:14px; }
+  .diff-banner .diff-group{ margin:6px 0; font-size:12.5px; line-height:1.8; }
+  .diff-banner .diff-group b{ margin-right:6px; }
+  .diff-tag{
+    display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:11px;
+    background:var(--surface-alt); border:1px solid var(--border); border-radius:5px; padding:1px 6px; margin:1px 3px 1px 0;
+  }
+  .diff-empty{ color:var(--text-muted); font-size:12.5px; }
+
+  .row-check{ width:16px; height:16px; cursor:pointer; accent-color:var(--accent); }
+  tr.resolved td{ opacity:.5; }
+  tr.resolved .name-cell, tr.resolved .code{ text-decoration:line-through; }
+
+  .history-toggle{
+    font:inherit; font-size:12.5px; font-weight:600; color:var(--accent); background:none; border:none;
+    cursor:pointer; padding:4px 0; text-decoration:underline;
+  }
+  .history-panel{
+    margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:14px 18px; box-shadow:var(--shadow);
+  }
+  .history-panel h3{ margin:0 0 10px; font-family:"Archivo",sans-serif; font-size:13.5px; }
+  .history-row{
+    display:flex; align-items:center; gap:14px; padding:7px 0; border-bottom:1px solid var(--border);
+    font-size:12.5px; color:var(--text-muted);
+  }
+  .history-row:last-child{ border-bottom:none; }
+  .history-row .hdate{ font-family:"IBM Plex Mono",monospace; color:var(--text); min-width:120px; }
+  .history-row .hfile{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  ::selection{ background:var(--accent-soft); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-row">
+        <span class="mark">MK</span>
+        <div>
+          <h1>Mapeamento de Kit</h1>
+          <p>Kits com item saindo de linha, cruzados com ritmo de venda e estoque — para saber quando trocar o código antes de zerar.</p>
+        </div>
+      </div>
+    </div>
+    <div class="upload-zone">
+      <div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn ghost small" id="deparaBtn" title="Atualizar a lista de itens saindo de linha a partir da planilha de coleção (.xlsx)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            Atualizar de/para (.xlsx)
+          </button>
+          <button class="btn" id="uploadBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+            Importar Relatório de Ritmo (.csv)
+          </button>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,text/csv">
+        <input type="file" id="deparaInput" accept=".xlsx">
+        <div class="meta-line" id="metaLine">Nenhum relatório carregado ainda.</div>
+        <div class="depara-line" id="deparaLine"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const DEPARA = {"1051100aa": {"categoria": "Cadeiras", "codigo_novo": "1051230aa", "nome_novo": "Cadeira Lótus Encosto Palha Assento Trenddie Cru Saturno (B186) NV", "venda_novo": 968.88, "custo_novo": 353.34}, "1051100ac": {"categoria": "Cadeiras", "codigo_novo": "1051230ad", "nome_novo": "Cadeira Lótus Encosto Palha Assento Terracota (B206) NV", "venda_novo": 968.88, "custo_novo": 353.34}, "1051100ag": {"categoria": "Cadeiras", "codigo_novo": "1051230ae", "nome_novo": "Cadeira Lótus Encosto Palha  Assento Faixa A Encomenda NV", "venda_novo": 1099.88, "custo_novo": 359.25}, "1051100ah": {"categoria": "Cadeiras", "codigo_novo": "1051230af", "nome_novo": "Cadeira Lótus Encosto Palha  Assento Faixa B Encomenda NV", "venda_novo": 1079.88, "custo_novo": 353.34}, "1051100ba": {"categoria": "Cadeiras", "codigo_novo": "1051230ah", "nome_novo": "Cadeira Lótus Castanho Encosto Palha Assento Trenddie Cru Saturno (B186) NV", "venda_novo": 968.88, "custo_novo": 353.34}, "1051100bg": {"categoria": "Cadeiras", "codigo_novo": "1051230ai", "nome_novo": "Cadeira Lótus Castanho Encosto Palha  Assento Faixa A Encomenda NV", "venda_novo": 1099.88, "custo_novo": 359.25}, "1051100bh": {"categoria": "Cadeiras", "codigo_novo": "1051230aj", "nome_novo": "Cadeira Lótus Castanho Encosto Palha  Assento Faixa B Encomenda NV", "venda_novo": 1079.88, "custo_novo": 353.34}, "1051104aa": {"categoria": "Cadeiras", "codigo_novo": "1051231aa", "nome_novo": "Cadeira Dudda Encosto e Assento Estofado Trenddie Cru Saturno (B186) NV", "venda_novo": 968.88, "custo_novo": 319.73}, "1051104ag": {"categoria": "Cadeiras", "codigo_novo": "1051231ac", "nome_novo": "Cadeira Dudda Encosto e Assento Estofado Encomenda Faixa A NV", "venda_novo": 1128.88, "custo_novo": 332.9}, "1051104ah": {"categoria": "Cadeiras", "codigo_novo": "1051231ad", "nome_novo": "Cadeira Dudda Encosto e Assento Estofado Encomenda Faixa B NV", "venda_novo": 1079.88, "custo_novo": 319.73}, "1051101aa": {"categoria": "Cadeiras", "codigo_novo": "1051233ab", "nome_novo": "Cadeira Dalí Encosto Palha Assento PU Cognac (A236) NV", "venda_novo": 1069.88, "custo_novo": 354.68}, "1051101ae": {"categoria": "Cadeiras", "codigo_novo": "1051233ad", "nome_novo": "Cadeira Dalí Encosto Palha Assento Trento Verde Pesto (B207) NV", "venda_novo": 1049.88, "custo_novo": 348.43}, "1051101ad": {"categoria": "Cadeiras", "codigo_novo": "1051233ae", "nome_novo": "Cadeira Dalí Encosto Palha Assento Terracota (B206) NV", "venda_novo": 1049.88, "custo_novo": 348.43}, "1051101ag": {"categoria": "Cadeiras", "codigo_novo": "1051233af", "nome_novo": "Cadeira Dalí Encosto Palha  Assento Faixa A Encomenda NV", "venda_novo": 1139.88, "custo_novo": 354.68}, "1051101ah": {"categoria": "Cadeiras", "codigo_novo": "1051233ag", "nome_novo": "Cadeira Dalí Encosto Palha  Assento Faixa B Encomenda NV", "venda_novo": 1119.88, "custo_novo": 348.43}, "1051101bg": {"categoria": "Cadeiras", "codigo_novo": "1051233ba", "nome_novo": "Cadeira Dalí Encosto Madeira Faixa A Encomenda NV", "venda_novo": 1058.88, "custo_novo": 328.04}, "1051101bh": {"categoria": "Cadeiras", "codigo_novo": "1051233bb", "nome_novo": "Cadeira Dalí Encosto Madeira Faixa B Encomenda NV", "venda_novo": 1038.88, "custo_novo": 321.46}, "1051103ab": {"categoria": "Cadeiras", "codigo_novo": "1051234aa", "nome_novo": "Cadeira Nord Encosto Estofado Trenddie Cru Saturno (B186) NV", "venda_novo": 828.88, "custo_novo": 290.9}, "1051103aa": {"categoria": "Cadeiras", "codigo_novo": "1051234ab", "nome_novo": "Cadeira Nord Encosto Estofado PU Cognac (A236) NV", "venda_novo": 828.88, "custo_novo": 290.9}, "1051103ag": {"categoria": "Cadeiras", "codigo_novo": "1051234ac", "nome_novo": "Cadeira Nord Encosto Estofado Faixa A Encomenda NV", "venda_novo": 909.88, "custo_novo": 304.07}, "1051103ah": {"categoria": "Cadeiras", "codigo_novo": "1051234ad", "nome_novo": "Cadeira Nord Encosto Estofado Faixa B Encomenda NV", "venda_novo": 869.88, "custo_novo": 290.9}, "1051103bg": {"categoria": "Cadeiras", "codigo_novo": "1051234ba", "nome_novo": "Cadeira Nord Encosto Madeira Assento Faixa A Encomenda NV", "venda_novo": 929.88, "custo_novo": 304.65}, "1051103bh": {"categoria": "Cadeiras", "codigo_novo": "1051234bb", "nome_novo": "Cadeira Nord Encosto Madeira Assento Faixa B Encomenda NV", "venda_novo": 909.88, "custo_novo": 298.4}, "1051103bb": {"categoria": "Cadeiras", "codigo_novo": "1051234bd", "nome_novo": "Cadeira Nord Encosto Madeira Assento Texture Off White (B189) NV", "venda_novo": 869.88, "custo_novo": 298.4}, "1051103be": {"categoria": "Cadeiras", "codigo_novo": "1051234be", "nome_novo": "Cadeira Nord Encosto Madeira Assento Trento Verde Pesto (B207) NV", "venda_novo": 869.88, "custo_novo": 298.4}, "1051103ba": {"categoria": "Cadeiras", "codigo_novo": "1051234bg", "nome_novo": "Cadeira Nord Encosto Madeira Assento PU Cognac (A236) NV", "venda_novo": 889.88, "custo_novo": 304.65}, "1051103bd": {"categoria": "Cadeiras", "codigo_novo": "1051234bi", "nome_novo": "Cadeira Nord Encosto Madeira Assento Terracota (B206) NV", "venda_novo": 869.88, "custo_novo": 298.4}, "1051103ca": {"categoria": "Cadeiras", "codigo_novo": "1051234ca", "nome_novo": "Cadeira Nord Castanho Encosto Madeira Assento Trento Trigo (B190) NV", "venda_novo": 869.88, "custo_novo": 298.4}, "1051103cg": {"categoria": "Cadeiras", "codigo_novo": "1051234cb", "nome_novo": "Cadeira Nord Castanho Encosto Madeira Assento Faixa A Encomenda NV", "venda_novo": 929.88, "custo_novo": 304.65}, "1051103ch": {"categoria": "Cadeiras", "codigo_novo": "1051234cc", "nome_novo": "Cadeira Nord Castanho Encosto Madeira Assento Faixa B Encomenda NV", "venda_novo": 909.88, "custo_novo": 298.4}, "1051102bg": {"categoria": "Cadeiras", "codigo_novo": "1051235aa", "nome_novo": "Cadeira Malai Encosto Palha  Assento Faixa A Encomenda NV", "venda_novo": 1249.88, "custo_novo": 376.09}, "1051102bh": {"categoria": "Cadeiras", "codigo_novo": "1051235ab", "nome_novo": "Cadeira Malai Encosto Palha  Assento Faixa B Encomenda NV", "venda_novo": 1229.88, "custo_novo": 369.84}, "1051102bb": {"categoria": "Cadeiras", "codigo_novo": "1051235ad", "nome_novo": "Cadeira Malai Encosto Palha Assento Trenddie Cru Saturno (B186) NV", "venda_novo": 1199.88, "custo_novo": 369.84}, "1051102ba": {"categoria": "Cadeiras", "codigo_novo": "1051235ae", "nome_novo": "Cadeira Malai Encosto Palha Assento PU Cognac (A236) NV", "venda_novo": 1219.88, "custo_novo": 376.09}, "1051218ga": {"categoria": "Cadeiras", "codigo_novo": "1051236ad", "nome_novo": "Banqueta Nord Encosto Estofado Assento Trenddie Cru Saturno (B186) NV", "venda_novo": 1298.88, "custo_novo": 447.34}, "1051302ag": {"categoria": "Cadeiras", "codigo_novo": "1051236ca", "nome_novo": "Banqueta Nord Encosto Madeira Assento Faixa A Encomenda NV", "venda_novo": 1348.88, "custo_novo": 424.97}, "1051302ah": {"categoria": "Cadeiras", "codigo_novo": "1051236cb", "nome_novo": "Banqueta Nord Encosto Madeira Assento Faixa B Encomenda NV", "venda_novo": 1328.88, "custo_novo": 418.72}, "1051302aa": {"categoria": "Cadeiras", "codigo_novo": "1051236cd", "nome_novo": "Banqueta Nord Encosto Madeira Assento Trenddie Cru Saturno (B186) NV", "venda_novo": 1209.88, "custo_novo": 418.72}, "1051502hl": {"categoria": "Mesas", "codigo_novo": "1051507aa", "nome_novo": "Mesa de Jantar Lalá Retangular 1,35mx90cm Vidro Off White com Borda Madeira NV", "venda_novo": 2879.88, "custo_novo": 958.43}, "1051502he": {"categoria": "Mesas", "codigo_novo": "1051507ba", "nome_novo": "Mesa de Jantar Lalá Retangular 1,60mx90cm Vidro Off White com Borda Madeira NV", "venda_novo": 3119.88, "custo_novo": 1038.14}, "1051502hf": {"categoria": "Mesas", "codigo_novo": "1051507ca", "nome_novo": "Mesa de Jantar Lalá Retangular 1,80mx1,00m Vidro Off White com Borda Madeira NVI", "venda_novo": 3809.88, "custo_novo": 1267.49}, "1051502hh": {"categoria": "Mesas", "codigo_novo": "1051507da", "nome_novo": "Mesa de Jantar Lalá Retangular 2,20mx1,10m Vidro Off White com Borda Madeira NVI", "venda_novo": 4538.88, "custo_novo": 1508}, "1051502je": {"categoria": "Mesas", "codigo_novo": "1051507ea", "nome_novo": "Mesa de Jantar Lalá Retangular 1,35mx90cm Carvalho Americano NV", "venda_novo": 2839.88, "custo_novo": 944.18}, "1051502jc": {"categoria": "Mesas", "codigo_novo": "1051507fa", "nome_novo": "Mesa de Jantar Lalá Retangular 1,60mx90cm Carvalho Americano NV", "venda_novo": 3069.88, "custo_novo": 1020.49}, "1051502jb": {"categoria": "Mesas", "codigo_novo": "1051507ga", "nome_novo": "Mesa de Jantar Lalá Retangular 1,80mx1,00m Carvalho Americano NV", "venda_novo": 3728.88, "custo_novo": 1238.49}, "1051502ja": {"categoria": "Mesas", "codigo_novo": "1051507ha", "nome_novo": "Mesa de Jantar Lalá Retangular 2,20mx1,10m Carvalho Americano NV", "venda_novo": 4018.88, "custo_novo": 1334.5}, "1051502me": {"categoria": "Mesas", "codigo_novo": "1051507ia", "nome_novo": "Mesa de Jantar Lalá Retangular 1,35x90cm Castanho NV", "venda_novo": 2839.88, "custo_novo": 944.18}, "1051502mc": {"categoria": "Mesas", "codigo_novo": "1051507ja", "nome_novo": "Mesa de Jantar Lalá Retangular 2,20mx1,10m Castanho NV", "venda_novo": 4018.88, "custo_novo": 1334.5}};
+
+const DEPARA_DEFAULT = DEPARA;
+let activeDepara = DEPARA;
+
+const STATUS_ORDER = ['crit','warn','mon','ok','neu'];
+const STATUS_META = {
+  crit:{ label:'CRÍTICO — trocar já', cls:'crit' },
+  warn:{ label:'ATENÇÃO — trocar em breve', cls:'warn' },
+  mon: { label:'Monitorar', cls:'mon' },
+  ok:  { label:'OK', cls:'ok' },
+  neu: { label:'Sem giro (30d) — verificar', cls:'neu' },
+};
+const STATUS_RANK = { crit:0, warn:1, mon:2, ok:3, neu:4 };
+
+let STATE = {
+  rows: [], byRecurso: [], meta:null, tab:'resumido', search:'', statusFilter:null,
+  resolved: {}, showResolved:false, diff:null, showHistory:false, lastRows:null,
+};
+
+function ptNumber(v){
+  if(v === undefined || v === null) return null;
+  v = String(v).trim();
+  if(v === '') return null;
+  v = v.replace(/\./g,'').replace(',', '.');
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function fmtDate(d){
+  if(!d) return '—';
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = d.getFullYear();
+  return `${dd}/${mm}/${yy}`;
+}
+function fmtDateTime(ts){
+  const d = new Date(ts);
+  return `${fmtDate(d)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function fmtMoney(v){
+  if(v === null || v === undefined || isNaN(v)) return '—';
+  return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+function parseCSV(text){
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.length > 0);
+  const header = lines[0].split(';').map(h => h.trim());
+  const idx = {};
+  header.forEach((h,i) => idx[h] = i);
+  const need = ['Kit','Recurso','Nome','Ritmo 1','Disponivel','Previsao','Situação'];
+  for(const n of need){ if(!(n in idx)) throw new Error('Coluna esperada não encontrada no CSV: ' + n); }
+  const hasPreco = 'Preço Venda' in idx;
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(';');
+    if(cols.length < 2) continue;
+    rows.push({
+      kit: (cols[idx['Kit']]||'').trim(),
+      recurso: (cols[idx['Recurso']]||'').trim(),
+      nome: (cols[idx['Nome']]||'').trim(),
+      ritmo: ptNumber(cols[idx['Ritmo 1']]),
+      disponivel: ptNumber(cols[idx['Disponivel']]),
+      previsao: ptNumber(cols[idx['Previsao']]),
+      situacao: (cols[idx['Situação']]||'').trim(),
+      preco: hasPreco ? ptNumber(cols[idx['Preço Venda']]) : null,
+    });
+  }
+  return rows;
+}
+
+const SITUACOES_IGNORADAS = [
+  'Venda Suspensa - Kit feito errado',
+];
+function situacaoIgnorada(s){
+  if(!s) return false;
+  const sl = s.trim().toLowerCase();
+  return SITUACOES_IGNORADAS.some(ig => ig.toLowerCase() === sl);
+}
+
+function buildKits(rows){
+  const kits = {};
+  for(const r of rows){
+    if(!r.kit) continue;
+    if(r.kit === r.recurso){
+      if(situacaoIgnorada(r.situacao)) continue; // pula kit com situação ignorada
+      kits[r.kit] = { nome:r.nome, ritmo:r.ritmo, disponivel:r.disponivel, previsao:r.previsao, situacao:r.situacao, preco:r.preco, components:[] };
+    } else if(kits[r.kit]){
+      kits[r.kit].components.push(r);
+    }
+  }
+  return kits;
+}
+
+function computeCoverage(ritmo, disponivel, previsao){
+  const r = ritmo || 0, d = disponivel || 0, p = previsao || 0;
+  const vendaDia = r > 0 ? r/30 : 0;
+  if(vendaDia <= 0){
+    return { vendaDia:0, diasDisp:null, diasTotal:null, ruptura:null, status:'neu', riscoFisico:false };
+  }
+  const diasDisp = d / vendaDia;
+  const diasTotal = (d+p) / vendaDia;
+  const ruptura = new Date(); ruptura.setDate(ruptura.getDate() + Math.round(diasTotal));
+  const riscoFisico = p > 0 && diasDisp <= 15;
+  let status;
+  if(diasTotal <= 15) status = 'crit';
+  else if(diasTotal <= 30) status = 'warn';
+  else if(diasTotal <= 60) status = 'mon';
+  else status = 'ok';
+  return { vendaDia, diasDisp, diasTotal, ruptura, status, riscoFisico };
+}
+
+function process(rows){
+  const kits = buildKits(rows);
+  const kitRows = [];
+  for(const kitCode in kits){
+    const kit = kits[kitCode];
+    for(const comp of kit.components){
+      const dp = activeDepara[comp.recurso];
+      if(!dp) continue;
+      kitRows.push({
+        kit: kitCode, kitNome: kit.nome, kitPreco: kit.preco,
+        recurso: comp.recurso, nome: comp.nome, categoria: dp.categoria,
+        ritmo: comp.ritmo, disponivel: comp.disponivel, previsao: comp.previsao, situacao: comp.situacao,
+        recursoNovo: dp.codigo_novo, nomeNovo: dp.nome_novo,
+      });
+    }
+  }
+  // group by recurso for resumido view (stock is shared per recurso, not per kit)
+  const byRecursoMap = {};
+  for(const r of kitRows){
+    if(!byRecursoMap[r.recurso]){
+      byRecursoMap[r.recurso] = { recurso:r.recurso, nome:r.nome, categoria:r.categoria,
+        ritmo:r.ritmo, disponivel:r.disponivel, previsao:r.previsao, situacao:r.situacao,
+        recursoNovo:r.recursoNovo, nomeNovo:r.nomeNovo, kits:new Set() };
+    }
+    byRecursoMap[r.recurso].kits.add(r.kit);
+  }
+  const byRecurso = Object.values(byRecursoMap).map(d => {
+    const cov = computeCoverage(d.ritmo, d.disponivel, d.previsao);
+    return { ...d, kits:[...d.kits].sort(), ...cov };
+  });
+  const perKit = kitRows.map(r => {
+    const cov = computeCoverage(r.ritmo, r.disponivel, r.previsao);
+    return { ...r, ...cov, key: r.kit + '|' + r.recurso };
+  });
+  const sortFn = (a,b) => {
+    const av = a.diasTotal === null ? Infinity : a.diasTotal;
+    const bv = b.diasTotal === null ? Infinity : b.diasTotal;
+    return av - bv;
+  };
+  byRecurso.sort(sortFn);
+  perKit.sort(sortFn);
+
+  // valor em risco: soma o preço dos kits (únicos) cujo pior status entre os itens afetados é crítico ou atenção
+  const kitWorst = {};
+  for(const r of perKit){
+    const cur = kitWorst[r.kit];
+    if(!cur || STATUS_RANK[r.status] < STATUS_RANK[cur.status]) kitWorst[r.kit] = { status:r.status, preco:r.kitPreco };
+  }
+  let valorEmRisco = 0;
+  for(const k in kitWorst){
+    const w = kitWorst[k];
+    if((w.status === 'crit' || w.status === 'warn') && typeof w.preco === 'number') valorEmRisco += w.preco;
+  }
+
+  return { byRecurso, perKit, totalKits:Object.keys(kits).length, valorEmRisco };
+}
+
+function statusCounts(list){
+  const c = { crit:0, warn:0, mon:0, ok:0, neu:0 };
+  for(const r of list) c[r.status]++;
+  return c;
+}
+
+// ---------- Resolvidos (checklist) ----------
+function loadResolved(){
+  try{ return JSON.parse(localStorage.getItem('mk_resolved') || '{}'); }catch(e){ return {}; }
+}
+function saveResolved(){
+  try{ localStorage.setItem('mk_resolved', JSON.stringify(STATE.resolved)); }catch(e){}
+}
+function toggleResolved(key){
+  if(STATE.resolved[key]) delete STATE.resolved[key];
+  else STATE.resolved[key] = { when: Date.now() };
+  saveResolved();
+  render();
+}
+
+// ---------- Histórico / comparação semana a semana ----------
+function loadHistory(){
+  try{ return JSON.parse(localStorage.getItem('mk_history') || '[]'); }catch(e){ return []; }
+}
+function saveHistory(hist){
+  try{ localStorage.setItem('mk_history', JSON.stringify(hist.slice(-12))); }catch(e){}
+}
+function computeDiff(byRecurso){
+  const hist = loadHistory();
+  if(hist.length === 0) return null;
+  const prev = hist[hist.length - 1];
+  const prevMap = {};
+  for(const p of prev.itens) prevMap[p.recurso] = p.status;
+  const curMap = {};
+  for(const r of byRecurso) curMap[r.recurso] = r.status;
+
+  const pioraram = [], melhoraram = [], novos = [], saíram = [];
+  for(const r of byRecurso){
+    const before = prevMap[r.recurso];
+    if(before === undefined){ novos.push(r); continue; }
+    if(before !== r.status){
+      if(STATUS_RANK[r.status] < STATUS_RANK[before]) pioraram.push({...r, statusAntes:before});
+      else melhoraram.push({...r, statusAntes:before});
+    }
+  }
+  for(const recurso in prevMap){
+    if(!(recurso in curMap)) saíram.push({ recurso, statusAntes:prevMap[recurso] });
+  }
+  const nada = pioraram.length===0 && melhoraram.length===0 && novos.length===0 && saíram.length===0;
+  return { prevWhen:prev.when, prevFile:prev.fileName, nada, pioraram, melhoraram, novos, saíram };
+}
+function pushHistory(byRecurso, fileName){
+  const hist = loadHistory();
+  hist.push({
+    when: Date.now(), fileName,
+    itens: byRecurso.map(r => ({ recurso:r.recurso, nome:r.nome, status:r.status })),
+  });
+  saveHistory(hist);
+}
+
+// ---------- de/para override (upload de planilha de coleção) ----------
+function loadDeparaOverride(){
+  try{
+    const raw = localStorage.getItem('mk_depara_custom');
+    const metaRaw = localStorage.getItem('mk_depara_custom_meta');
+    if(raw){
+      activeDepara = JSON.parse(raw);
+      return metaRaw ? JSON.parse(metaRaw) : null;
+    }
+  }catch(e){}
+  return null;
+}
+function buildNameLookup(rows){
+  const lookup = {};
+  if(!rows) return lookup;
+  for(const r of rows){ if(r.recurso) lookup[r.recurso] = r.nome; }
+  return lookup;
+}
+function parseDeparaWorkbook(workbook, nameLookup){
+  const out = {};
+  let count = 0;
+  for(const sheetName of workbook.SheetNames){
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:true, defval:null });
+    for(let i=1;i<rows.length;i++){
+      const row = rows[i];
+      if(!row || row.length < 9) continue;
+      const codigoNovo = row[0], nomeNv = row[1], custoNovo = row[4], vendaNovo = row[6], codigoAntigo = row[8];
+      if(!codigoAntigo) continue;
+      const ca = String(codigoAntigo).trim();
+      const cn = codigoNovo ? String(codigoNovo).trim() : null;
+      const nomeFinal = (cn && nameLookup[cn]) ? nameLookup[cn] : nomeNv;
+      out[ca] = { categoria: sheetName, codigo_novo: cn, nome_novo: nomeFinal,
+        venda_novo: typeof vendaNovo === 'number' ? vendaNovo : ptNumber(vendaNovo),
+        custo_novo: typeof custoNovo === 'number' ? custoNovo : ptNumber(custoNovo) };
+      count++;
+    }
+  }
+  return { depara: out, count };
+}
+function updateDeparaLine(){
+  const el = document.getElementById('deparaLine');
+  let meta = null;
+  try{ meta = JSON.parse(localStorage.getItem('mk_depara_custom_meta') || 'null'); }catch(e){}
+  if(meta){
+    el.innerHTML = `De/para: personalizado — <strong>${meta.fileName}</strong> (${meta.count} itens, ${fmtDateTime(meta.when)}) · <a id="restoreDeparaLink">restaurar padrão</a>`;
+  }else{
+    el.innerHTML = `De/para: padrão embutido (${Object.keys(DEPARA_DEFAULT).length} itens)`;
+  }
+  const link = document.getElementById('restoreDeparaLink');
+  if(link) link.addEventListener('click', restoreDeparaDefault);
+}
+function restoreDeparaDefault(){
+  try{
+    localStorage.removeItem('mk_depara_custom');
+    localStorage.removeItem('mk_depara_custom_meta');
+  }catch(e){}
+  activeDepara = DEPARA_DEFAULT;
+  updateDeparaLine();
+  if(STATE.lastRows){ STATE.data = process(STATE.lastRows); render(); }
+}
+function loadDeparaFile(file){
+  if(typeof XLSX === 'undefined'){
+    alert('Não consegui carregar a biblioteca de leitura de planilhas (XLSX). Verifique sua conexão com a internet e tente de novo.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type:'array' });
+      const nameLookup = buildNameLookup(STATE.lastRows);
+      const { depara, count } = parseDeparaWorkbook(workbook, nameLookup);
+      if(count === 0){ alert('Não encontrei nenhuma linha de de/para (coluna "Código Antigo") nessa planilha.'); return; }
+      activeDepara = depara;
+      const meta = { fileName:file.name, count, when:Date.now() };
+      try{
+        localStorage.setItem('mk_depara_custom', JSON.stringify(depara));
+        localStorage.setItem('mk_depara_custom_meta', JSON.stringify(meta));
+      }catch(err){}
+      updateDeparaLine();
+      if(STATE.lastRows){ STATE.data = process(STATE.lastRows); render(); }
+    }catch(err){
+      alert('Não consegui ler esse arquivo .xlsx: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---------- Exportar CSV ----------
+function csvEscape(v){
+  v = (v === null || v === undefined) ? '' : String(v);
+  if(v.includes(';') || v.includes('"') || v.includes('\n')) return '"' + v.replace(/"/g,'""') + '"';
+  return v;
+}
+async function exportCSV(){
+  const isResumido = STATE.tab === 'resumido';
+  const rows = filterRows(isResumido ? STATE.data.byRecurso : STATE.data.perKit);
+  let headers, lines;
+  if(isResumido){
+    headers = ['Status','Risco físico','Recurso','Nome','Categoria','Ritmo 30d','Disponível','Previsão','Só estoque (dias)','Com previsão (dias)','Ruptura','Novo código','Nome novo','Nº kits','Kits'];
+    lines = rows.map(r => [
+      STATUS_META[r.status].label, r.riscoFisico ? 'SIM' : '', r.recurso, r.nome, r.categoria||'',
+      r.ritmo ?? 0, r.disponivel ?? 0, r.previsao ?? 0,
+      r.diasDisp===null?'':Math.round(r.diasDisp), r.diasTotal===null?'':Math.round(r.diasTotal),
+      fmtDate(r.ruptura), r.recursoNovo||'', r.nomeNovo||'', r.kits.length, r.kits.join(', ')
+    ]);
+  }else{
+    headers = ['Status','Risco físico','Kit','Nome do kit','Recurso','Nome item','Categoria','Ritmo 30d','Disponível','Previsão','Só estoque (dias)','Com previsão (dias)','Ruptura','Novo código','Nome novo','Resolvido'];
+    lines = rows.map(r => [
+      STATUS_META[r.status].label, r.riscoFisico ? 'SIM' : '', r.kit, r.kitNome, r.recurso, r.nome, r.categoria||'',
+      r.ritmo ?? 0, r.disponivel ?? 0, r.previsao ?? 0,
+      r.diasDisp===null?'':Math.round(r.diasDisp), r.diasTotal===null?'':Math.round(r.diasTotal),
+      fmtDate(r.ruptura), r.recursoNovo||'', r.nomeNovo||'', STATE.resolved[r.key] ? 'SIM' : ''
+    ]);
+  }
+  const csv = [headers, ...lines].map(row => row.map(csvEscape).join(';')).join('\r\n');
+  const stamp = new Date().toISOString().slice(0,10);
+  const filename = `mapeamento_kit_${isResumido?'resumido':'por_kit'}_${stamp}.csv`;
+  const content = '﻿' + csv;
+
+  // Em páginas publicadas como Artifact, o download direto do navegador não funciona —
+  // usamos a capability "downloads" quando disponível. Em uma página hospedada normalmente
+  // (ex: GitHub Pages), window.claude não existe e caímos no link de download padrão.
+  if(window.claude && typeof window.claude.use === 'function'){
+    try{
+      const downloads = await window.claude.use('downloads');
+      if(downloads){
+        await downloads.save({ filename, data: content });
+        return;
+      }
+    }catch(err){
+      // segue para o fallback abaixo (ex: viewer recusou, ou capability indisponível)
+    }
+  }
+  const blob = new Blob([content], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function statusChip(key){
+  const m = STATUS_META[key];
+  const active = STATE.statusFilter === key ? 'active' : '';
+  return `<button class="chip ${active}" data-status="${key}">
+    <span class="swatch" style="background:var(--${key}-bg)"></span>
+    ${m.label.split(' — ')[0]}
+  </button>`;
+}
+
+function filterRows(list){
+  let out = list;
+  if(STATE.statusFilter) out = out.filter(r => r.status === STATE.statusFilter);
+  if(STATE.tab === 'porKit' && !STATE.showResolved) out = out.filter(r => !STATE.resolved[r.key]);
+  if(STATE.search){
+    const q = STATE.search.toLowerCase();
+    out = out.filter(r =>
+      (r.recurso && r.recurso.toLowerCase().includes(q)) ||
+      (r.nome && r.nome.toLowerCase().includes(q)) ||
+      (r.kit && r.kit.toLowerCase().includes(q)) ||
+      (r.kitNome && r.kitNome.toLowerCase().includes(q)) ||
+      (r.recursoNovo && r.recursoNovo.toLowerCase().includes(q))
+    );
+  }
+  return out;
+}
+
+function kitsCell(kits){
+  const LIMIT = 5;
+  if(kits.length <= LIMIT) return kits.map(k=>`<span class="kit-tag">${k}</span>`).join('');
+  const shown = kits.slice(0,LIMIT).map(k=>`<span class="kit-tag">${k}</span>`).join('');
+  const rest = kits.slice(LIMIT).map(k=>`<span class="kit-tag">${k}</span>`).join('');
+  const id = 'kits_' + Math.random().toString(36).slice(2);
+  return `<span class="kits-shown">${shown}</span><span class="kits-rest" id="${id}" style="display:none">${rest}</span><button type="button" class="kit-more" data-target="${id}">+${kits.length-LIMIT}</button>`;
+}
+
+function covCell(v){
+  return v === null || v === undefined ? '—' : Math.round(v) + ' d';
+}
+
+function renderResumido(){
+  const rows = filterRows(STATE.data.byRecurso);
+  const body = rows.map(r => `
+    <tr class="s-${r.status}">
+      <td><span class="pill ${STATUS_META[r.status].cls}">${STATUS_META[r.status].label}</span></td>
+      <td>${r.riscoFisico ? '<span class="risk-badge">⚠ SIM</span>' : '<span class="sub">—</span>'}</td>
+      <td class="code">${r.recurso}</td>
+      <td class="name-cell">${r.nome}</td>
+      <td>${r.categoria||''}</td>
+      <td class="num">${r.ritmo ?? 0}</td>
+      <td class="num">${r.disponivel ?? 0}</td>
+      <td class="num">${r.previsao ?? 0}</td>
+      <td class="num">${covCell(r.diasDisp)}</td>
+      <td class="num cov-total">${covCell(r.diasTotal)}</td>
+      <td class="num">${fmtDate(r.ruptura)}</td>
+      <td class="code">${r.recursoNovo||'—'}</td>
+      <td class="name-cell">${r.nomeNovo||'—'}</td>
+      <td class="num">${r.kits.length}</td>
+      <td class="kits-cell">${kitsCell(r.kits)}</td>
+    </tr>`).join('');
+  return `
+    <div class="table-scroll"><table>
+      <colgroup>
+        <col style="width:9.62%"><col style="width:4.98%"><col style="width:5.66%"><col style="width:13.01%">
+        <col style="width:5.09%"><col style="width:4.07%"><col style="width:4.75%"><col style="width:4.19%">
+        <col style="width:4.64%"><col style="width:5.66%"><col style="width:5.66%"><col style="width:5.66%">
+        <col style="width:11.31%"><col style="width:3.28%"><col style="width:12.42%">
+      </colgroup>
+      <thead><tr>
+        <th>Status</th><th>Risco físico</th><th>Recurso</th><th>Nome</th><th>Categoria</th>
+        <th>Ritmo 30d</th><th>Disponível</th><th>Previsão</th>
+        <th>Só estoque</th><th>Com previsão</th><th>Ruptura</th>
+        <th>Novo código</th><th>Nome novo</th><th>Nº kits</th><th>Kits</th>
+      </tr></thead>
+      <tbody>${body || `<tr><td colspan="15" style="text-align:center;padding:28px;color:var(--text-muted)">Nada encontrado com esse filtro.</td></tr>`}</tbody>
+    </table></div>`;
+}
+
+function renderPorKit(){
+  const rows = filterRows(STATE.data.perKit);
+  const body = rows.map(r => `
+    <tr class="s-${r.status} ${STATE.resolved[r.key] ? 'resolved' : ''}">
+      <td style="text-align:center;"><input type="checkbox" class="row-check" data-key="${r.key}" ${STATE.resolved[r.key]?'checked':''} title="Marcar como já trocado"></td>
+      <td><span class="pill ${STATUS_META[r.status].cls}">${STATUS_META[r.status].label}</span></td>
+      <td>${r.riscoFisico ? '<span class="risk-badge">⚠ SIM</span>' : '<span class="sub">—</span>'}</td>
+      <td class="code">${r.kit}</td>
+      <td class="name-cell">${r.kitNome}</td>
+      <td class="code">${r.recurso}</td>
+      <td class="name-cell">${r.nome}</td>
+      <td>${r.categoria||''}</td>
+      <td class="num">${r.ritmo ?? 0}</td>
+      <td class="num">${r.disponivel ?? 0}</td>
+      <td class="num">${r.previsao ?? 0}</td>
+      <td class="num">${covCell(r.diasDisp)}</td>
+      <td class="num cov-total">${covCell(r.diasTotal)}</td>
+      <td class="num">${fmtDate(r.ruptura)}</td>
+      <td class="code">${r.recursoNovo||'—'}</td>
+      <td class="name-cell">${r.nomeNovo||'—'}</td>
+    </tr>`).join('');
+  return `
+    <div class="table-scroll"><table>
+      <colgroup>
+        <col style="width:1.99%">
+        <col style="width:9.35%"><col style="width:4.79%"><col style="width:5.61%"><col style="width:11.1%">
+        <col style="width:5.84%"><col style="width:11.1%"><col style="width:5.26%">
+        <col style="width:3.97%"><col style="width:4.67%"><col style="width:4.09%">
+        <col style="width:4.56%"><col style="width:5.61%"><col style="width:5.14%"><col style="width:5.84%">
+        <col style="width:11.1%">
+      </colgroup>
+      <thead><tr>
+        <th></th>
+        <th>Status</th><th>Risco físico</th><th>Kit</th><th>Nome do kit</th><th>Recurso</th><th>Nome item</th><th>Categoria</th>
+        <th>Ritmo 30d</th><th>Disponível</th><th>Previsão</th>
+        <th>Só estoque</th><th>Com previsão</th><th>Ruptura</th>
+        <th>Novo código</th><th>Nome novo</th>
+      </tr></thead>
+      <tbody>${body || `<tr><td colspan="16" style="text-align:center;padding:28px;color:var(--text-muted)">Nada encontrado com esse filtro.</td></tr>`}</tbody>
+    </table></div>`;
+}
+
+function renderDiffBanner(){
+  const d = STATE.diff;
+  if(!d) return '';
+  if(d.nada){
+    return `<div class="diff-banner"><h3>Desde a última importação (${fmtDateTime(d.prevWhen)})</h3><div class="diff-empty">Nada mudou de status desde a última vez.</div></div>`;
+  }
+  const group = (label, items, mapFn) => items.length ? `<div class="diff-group"><b>${label}:</b> ${items.map(mapFn).join(' ')}</div>` : '';
+  return `<div class="diff-banner">
+    <h3>Desde a última importação (${fmtDateTime(d.prevWhen)})</h3>
+    ${group('Pioraram', d.pioraram, r => `<span class="diff-tag">${r.recurso} · ${STATUS_META[r.statusAntes].label.split(' — ')[0]} → ${STATUS_META[r.status].label.split(' — ')[0]}</span>`)}
+    ${group('Melhoraram', d.melhoraram, r => `<span class="diff-tag">${r.recurso} · ${STATUS_META[r.statusAntes].label.split(' — ')[0]} → ${STATUS_META[r.status].label.split(' — ')[0]}</span>`)}
+    ${group('Novos na lista', d.novos, r => `<span class="diff-tag">${r.recurso}</span>`)}
+    ${group('Saíram da lista (código não aparece mais nos kits)', d.saíram, r => `<span class="diff-tag">${r.recurso}</span>`)}
+  </div>`;
+}
+
+function renderHistoryPanel(){
+  if(!STATE.showHistory) return '';
+  const hist = loadHistory().slice().reverse();
+  if(hist.length === 0){
+    return `<div class="history-panel"><h3>Histórico de importações</h3><div class="diff-empty">Nenhuma importação anterior registrada ainda.</div></div>`;
+  }
+  const rows = hist.map(h => {
+    const c = { crit:0, warn:0 };
+    for(const it of h.itens){ if(it.status==='crit') c.crit++; else if(it.status==='warn') c.warn++; }
+    return `<div class="history-row">
+      <span class="hdate">${fmtDateTime(h.when)}</span>
+      <span class="hfile">${h.fileName}</span>
+      <span>${c.crit} crítico(s) · ${c.warn} atenção</span>
+    </div>`;
+  }).join('');
+  return `<div class="history-panel"><h3>Histórico de importações (${hist.length})</h3>${rows}</div>`;
+}
+
+function renderStats(){
+  const { byRecurso, perKit, totalKits, valorEmRisco } = STATE.data;
+  const affectedKits = new Set(perKit.map(r=>r.kit)).size;
+  const riskCount = byRecurso.filter(r=>r.riscoFisico).length;
+  const resolvedCount = perKit.filter(r => STATE.resolved[r.key]).length;
+  const c = statusCounts(byRecurso);
+  const stats = [
+    ['Kits no relatório', totalKits, ''],
+    ['Kits impactados', affectedKits, ''],
+    ['Recursos afetados', byRecurso.length, ''],
+    ['Críticos', c.crit, 'crit'],
+    ['Em atenção', c.warn, 'warn'],
+    ['Risco físico', riskCount, 'risk'],
+    ['Valor em risco', fmtMoney(valorEmRisco), 'money'],
+    ['Resolvidos', resolvedCount, 'done'],
+  ];
+  return `<div class="stat-row">` + stats.map(([label,val,cls]) =>
+    `<div class="stat ${cls}"><div class="label">${label}</div><div class="value num">${val}</div></div>`
+  ).join('') + `</div>`;
+}
+
+function render(){
+  const content = document.getElementById('content');
+  if(!STATE.data){
+    content.innerHTML = `
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4z" opacity="0"/><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        <h2>Importe o Relatório de Ritmo</h2>
+        <p>Clique em "Importar Relatório de Ritmo" e selecione o .csv da semana. O app cruza automaticamente com os itens saindo de linha e calcula quando cada kit precisa trocar de código.</p>
+      </div>`;
+    return;
+  }
+  const counts = { resumido: STATE.data.byRecurso.length, porKit: STATE.data.perKit.length };
+  const resolvedTotal = STATE.data.perKit.filter(r => STATE.resolved[r.key]).length;
+  content.innerHTML = `
+    ${renderDiffBanner()}
+    ${renderStats()}
+    <div class="tabs">
+      <button class="tab ${STATE.tab==='resumido'?'active':''}" data-tab="resumido">Resumido <span class="count">${counts.resumido}</span></button>
+      <button class="tab ${STATE.tab==='porKit'?'active':''}" data-tab="porKit">Por Kit <span class="count">${counts.porKit}</span></button>
+    </div>
+    <div class="toolbar">
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="searchInput" type="text" placeholder="Buscar por kit, recurso ou nome..." value="${STATE.search}">
+      </div>
+      ${STATUS_ORDER.map(statusChip).join('')}
+    </div>
+    <div class="toolbar-row">
+      <button class="btn ghost small" id="exportBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v12M12 16l-4-4M12 16l4-4"/><path d="M4 20h16"/></svg>
+        Exportar CSV
+      </button>
+      ${STATE.tab==='porKit' ? `<button class="chip ${STATE.showResolved?'active':''}" id="toggleResolvedBtn">Mostrar resolvidos (${resolvedTotal})</button>` : ''}
+      <button class="history-toggle" id="toggleHistoryBtn">${STATE.showHistory ? 'Ocultar' : 'Ver'} histórico de importações</button>
+    </div>
+    <div id="tableHolder">${STATE.tab==='resumido' ? renderResumido() : renderPorKit()}</div>
+    ${renderHistoryPanel()}
+    <footer class="note">
+      <b>Como ler:</b> "Só estoque" conta só o disponível físico; "Com previsão" soma a previsão de compra (comprada com o fornecedor) e é a coluna que define o Status e a data de ruptura.
+      <b>Risco físico</b> marca quando o estoque físico zera em até 15 dias mesmo com a cobertura total ok — o kit pode ficar temporariamente sem vender até a previsão chegar.
+      <b>Valor em risco</b> soma o preço de venda dos kits críticos/atenção (um kit conta uma vez, mesmo com mais de um item afetado).
+      Faixas: Crítico ≤15 dias · Atenção 16–30 · Monitorar 31–60 · OK acima de 60.
+    </footer>`;
+
+  document.querySelectorAll('.tab').forEach(el => el.addEventListener('click', () => {
+    STATE.tab = el.dataset.tab; render();
+  }));
+  document.querySelectorAll('.chip[data-status]').forEach(el => el.addEventListener('click', () => {
+    STATE.statusFilter = STATE.statusFilter === el.dataset.status ? null : el.dataset.status;
+    render();
+  }));
+  const exportBtn = document.getElementById('exportBtn');
+  if(exportBtn) exportBtn.addEventListener('click', exportCSV);
+  const toggleResolvedBtn = document.getElementById('toggleResolvedBtn');
+  if(toggleResolvedBtn) toggleResolvedBtn.addEventListener('click', () => { STATE.showResolved = !STATE.showResolved; render(); });
+  const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
+  if(toggleHistoryBtn) toggleHistoryBtn.addEventListener('click', () => { STATE.showHistory = !STATE.showHistory; render(); });
+  document.querySelectorAll('.row-check').forEach(el => el.addEventListener('change', () => toggleResolved(el.dataset.key)));
+
+  const si = document.getElementById('searchInput');
+  si.addEventListener('input', () => { STATE.search = si.value; renderTableOnly(); });
+  si.focus(); si.selectionStart = si.selectionEnd = si.value.length;
+}
+
+function renderTableOnly(){
+  document.getElementById('tableHolder').innerHTML = STATE.tab==='resumido' ? renderResumido() : renderPorKit();
+  document.querySelectorAll('.chip[data-status]').forEach(el => el.addEventListener('click', () => {
+    STATE.statusFilter = STATE.statusFilter === el.dataset.status ? null : el.dataset.status;
+    render();
+  }));
+  document.querySelectorAll('.row-check').forEach(el => el.addEventListener('change', () => toggleResolved(el.dataset.key)));
+}
+
+function updateMeta(fileName, count){
+  const now = new Date();
+  document.getElementById('metaLine').innerHTML =
+    `Carregado: <strong>${fileName}</strong> · ${fmtDateTime(now.getTime())} · ${count} linhas`;
+}
+
+function loadCSVFile(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const decoder = new TextDecoder('windows-1252');
+      const text = decoder.decode(e.target.result);
+      const rows = parseCSV(text);
+      STATE.lastRows = rows;
+      STATE.data = process(rows);
+      STATE.diff = computeDiff(STATE.data.byRecurso);
+      pushHistory(STATE.data.byRecurso, file.name);
+      STATE.statusFilter = null; STATE.search='';
+      updateMeta(file.name, rows.length);
+      try{
+        localStorage.setItem('ritmo_last_csv_b64', btoa(unescape(encodeURIComponent(text))));
+        localStorage.setItem('ritmo_last_meta', JSON.stringify({name:file.name, count:rows.length, when:Date.now()}));
+      }catch(err){}
+      render();
+    }catch(err){
+      alert('Não consegui ler esse CSV: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.kit-more');
+  if(!btn) return;
+  const target = document.getElementById(btn.dataset.target);
+  if(!target) return;
+  const open = target.style.display !== 'none';
+  target.style.display = open ? 'none' : 'inline';
+  btn.textContent = open ? ('+' + target.querySelectorAll('.kit-tag').length) : '−';
+});
+
+document.getElementById('uploadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  if(e.target.files && e.target.files[0]) loadCSVFile(e.target.files[0]);
+});
+document.getElementById('deparaBtn').addEventListener('click', () => document.getElementById('deparaInput').click());
+document.getElementById('deparaInput').addEventListener('change', (e) => {
+  if(e.target.files && e.target.files[0]) loadDeparaFile(e.target.files[0]);
+});
+
+// restore last session from localStorage, if present
+(function restore(){
+  STATE.resolved = loadResolved();
+  loadDeparaOverride();
+  updateDeparaLine();
+  try{
+    const b64 = localStorage.getItem('ritmo_last_csv_b64');
+    const metaRaw = localStorage.getItem('ritmo_last_meta');
+    if(b64 && metaRaw){
+      const meta = JSON.parse(metaRaw);
+      const text = decodeURIComponent(escape(atob(b64)));
+      const rows = parseCSV(text);
+      STATE.lastRows = rows;
+      STATE.data = process(rows);
+      document.getElementById('metaLine').innerHTML =
+        `Última importação: <strong>${meta.name}</strong> · ${fmtDateTime(meta.when)} · ${meta.count} linhas`;
+    }
+  }catch(err){}
+  render();
+})();
+
+</script>
